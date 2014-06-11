@@ -1,6 +1,4 @@
 /*
- * Copyright 2014 Petre Eftime
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -75,21 +73,34 @@ GLfloat p_matrix[16], mv_matrix[16];
 #define NEAR 0.5f
 #define FAR 16.0f
 
-#define GRID_LINES		7
-#define GRID_COLUMNS	8
-#define GRID_MIN_X		-25.0f
-#define GRID_MAX_X		25.0f
-#define GRID_MIN_Y		-35.0f
-#define GRID_MAX_Y		20.0f
-#define MY_WIDTH		(GRID_MAX_X-GRID_MIN_X)
-#define MY_HEIGHT		(GRID_MAX_Y-GRID_MIN_Y)
-#define LINE_STEP		MY_HEIGHT/(GRID_LINES-1.0f)
-#define COLUMN_STEP		MY_WIDTH/(GRID_COLUMNS-1.0f)
-#define RADIUS			COLUMN_STEP/2.0f * 0.9f
-#define CENTER_X		GRID_MIN_X + COLUMN_STEP/2.0f
-#define CENTER_Y		GRID_MAX_Y + LINE_STEP/2.0f
+#define GRID_LINES			7
+#define GRID_COLUMNS		8
+#define GRID_MIN_X			(-25.0f)
+#define GRID_MAX_X			25.0f
+#define GRID_MIN_Y			(-35.0f)
+#define GRID_MAX_Y			20.0f
+#define MY_WIDTH			(GRID_MAX_X-GRID_MIN_X)
+#define MY_HEIGHT			(GRID_MAX_Y-GRID_MIN_Y)
+#define LINE_STEP			MY_HEIGHT/(GRID_LINES-1.0f)
+#define COLUMN_STEP			MY_WIDTH/(GRID_COLUMNS-1.0f)
+#define RADIUS				COLUMN_STEP/2.0f * 0.9f
+#define CENTER_X_PLAYER_0	GRID_MIN_X + COLUMN_STEP/2.0f
+#define CENTER_Y_PLAYER_0	GRID_MAX_Y + LINE_STEP/2.0f
+#define CENTER_X_PLAYER_1	GRID_MAX_X - COLUMN_STEP/2.0f
+#define CENTER_Y_PLAYER_1	GRID_MAX_Y + LINE_STEP/2.0f
+#define MAX_PIECES			21 // (6*7)/2 - 6x7 board, 2 players
 
 static GLfloat grid[GRID_COLUMNS*4];
+
+// (2 players) x (max. pieces on board) x (each piece has 2 coordinates)
+static GLfloat player_pieces[2][MAX_PIECES][2] = {0.0f};
+static GLint pieces_on_board[2] = {0};
+static GLfloat player_piece_centers[2][2] = {
+										{CENTER_X_PLAYER_0, CENTER_Y_PLAYER_0},
+										{CENTER_X_PLAYER_1, CENTER_Y_PLAYER_1}};
+
+// index of current player (0 or 1)
+static GLint player_in_turn = 0;
 
 GLuint gProgram;
 GLuint gvPositionHandle;
@@ -109,7 +120,7 @@ GLfloat t_x = 0.0f, t_y = 0.0f, t_z = 0.0f;
 float  width = 0, height = 0;
 
 // coordinates of screen touch
-float touch_x = CENTER_X, touch_y = CENTER_Y;
+float touch_x, touch_y;
 bool dragging = false;
 
 // multiply two 4x4 matrices and place the result in the first one
@@ -308,6 +319,8 @@ bool setup_graphics(int w, int h) {
     gvPositionHandle	= glGetAttribLocation(gProgram, "vPosition");
     gvColorHandle		= glGetAttribLocation(gProgram, "vColor");
 
+    LOGI("color handle = %i", gvColorHandle);
+
     glViewport(0, 0, w, h);
 
     set_model_view_matrix(mv_matrix);
@@ -315,6 +328,10 @@ bool setup_graphics(int w, int h) {
 
     width	= w;
     height	= h;
+
+    // initialize first player's piece position
+    touch_x	= player_piece_centers[player_in_turn][0];
+    touch_y	= player_piece_centers[player_in_turn][1];
 
     return true;
 }
@@ -375,6 +392,7 @@ static void draw_circle(GLfloat center_x, GLfloat center_y, GLfloat radius)
 {
 	GLfloat circle[360 * 4 + 2], x, y;
 	GLint i;
+	GLfloat colors[4] = {1.0f, 0.0f, 0.0f, 1.0f};
 
 	for (i=0; i<360*4; i+=4) {
 		circle[i]	= radius * cos(i/4.0f * 0.0174532f) + center_x;
@@ -388,11 +406,42 @@ static void draw_circle(GLfloat center_x, GLfloat center_y, GLfloat radius)
 	circle[i+1]	= center_y;
 
 	glVertexAttribPointer(gvPositionHandle, 2, GL_FLOAT, GL_FALSE, 0, circle);
+	glVertexAttribPointer(gvColorHandle, 4, GL_FLOAT, GL_FALSE, 0, colors);
+
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 360*2+1);
 }
 
+static void draw_players_pieces()
+{
+	int player, piece;
+
+	for (player=0; player<2; player++) {
+		piece = 0;
+
+		while (piece < pieces_on_board[player]) {
+			draw_circle(player_pieces[player][piece][0],
+						player_pieces[player][piece][1], RADIUS);
+
+			piece++;
+		}
+	}
+}
+
+static void draw_pieces_to_play()
+{
+	int other_player = 1 - player_in_turn;
+
+	// draw piece of the current player
+	draw_circle(touch_x, touch_y, RADIUS);
+
+	// draw piece of the other player
+	draw_circle(player_piece_centers[other_player][0],
+			player_piece_centers[other_player][1],
+			RADIUS);
+}
+
 void render_frame() {
-    glClearColor(0, 0, 0, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear( GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
     glUseProgram(gProgram);
@@ -401,28 +450,38 @@ void render_frame() {
     glUniformMatrix4fv(gMVmatrix, 1, GL_FALSE, mv_matrix);
 
     glEnableVertexAttribArray(gvPositionHandle);
+    glEnableVertexAttribArray(gvColorHandle);
 
     draw_grid();
-    draw_circle(touch_x, touch_y, RADIUS);
-
+    draw_players_pieces();
+    draw_pieces_to_play();
 }
 
 // Place the piece on board
 void valid_move(int line, int column)
 {
-	// TODO
+	// add piece on board
+	int turn = player_in_turn;
 
-	touch_y	= line * LINE_STEP;
-	touch_x	= column * COLUMN_STEP;
+	player_pieces[turn][pieces_on_board[turn]][0]	= (column+0.5f)*COLUMN_STEP+GRID_MIN_X;
+	player_pieces[turn][pieces_on_board[turn]][1]	= (line+0.5f)*LINE_STEP+GRID_MIN_Y;
+
+	// update number of player's pieces on board
+	pieces_on_board[turn]++;
+
+	// switch turns
+	player_in_turn = 1 - turn;
+
+	// update touch_x, touch_y
+	touch_x	= player_piece_centers[player_in_turn][0];
+	touch_y	= player_piece_centers[player_in_turn][1];
 }
 
 // Put the piece back in its starting point
 void invalid_move()
 {
-	// TODO
-
-	touch_x	= CENTER_X;
-	touch_y	= CENTER_Y;
+	touch_x	= player_piece_centers[player_in_turn][0];
+	touch_y	= player_piece_centers[player_in_turn][1];
 }
 
 /* Called upon the end of a drag & drop move of the player.
@@ -440,12 +499,17 @@ int touch_screen(float x, float y, bool drop)
 		 * (it is the only possible case since we placed the board on the lower
 		 * screen and full-width)
 		 */
+		float column;
+
 		if (y > GRID_MAX_Y) {
 			invalid_move();
 			return -1;
 		}
 
-		return (int)(x/COLUMN_STEP);
+		column = (x-GRID_MIN_X);
+		column /= COLUMN_STEP;
+
+		return (int)column;
 	} else {
 		// update dragging position
 		touch_x	= x;
@@ -457,10 +521,13 @@ int touch_screen(float x, float y, bool drop)
 
 bool spot_on(float x, float y)
 {
+	GLfloat center_x = player_piece_centers[player_in_turn][0],
+			center_y = player_piece_centers[player_in_turn][1];
+
 	TRANSFORM_COORD(x, y);
 
-	if (CENTER_X + RADIUS >= x  && CENTER_X - RADIUS <= x &&
-		CENTER_Y + RADIUS >= y  && CENTER_Y - RADIUS <= y)
+	if (center_x + RADIUS >= x  && center_x - RADIUS <= x &&
+		center_y + RADIUS >= y  && center_y - RADIUS <= y)
 		return true;
 
 	return false;

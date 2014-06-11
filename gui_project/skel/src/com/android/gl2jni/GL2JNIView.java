@@ -365,6 +365,8 @@ class GL2JNIView extends GLSurfaceView {
 			if (column >= 0) {
 				// TODO => check if column is valid; if not, call invalidMove()
 				//		=> if valid, call validMove(line, column)
+				
+				GL2JNILib.validMove(1, column);
 			}
 				
 			if (drop)
