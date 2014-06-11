@@ -1,0 +1,2 @@
+set solib-search-path ./obj/local/armeabi-v7a
+directory /home/cristina/android/android-ndk/platforms/android-19/arch-arm/usr/include /home/cristina/android/android-ndk/sources/cxx-stl/system/include jni
