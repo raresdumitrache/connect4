@@ -1,38 +1,30 @@
 package com.connect4.main;
 
-import com.connect4.utils.Const;
-import com.connect4.utils.Utils;
-
-import android.R;
-import android.os.Bundle;
-import android.os.RemoteException;
-import android.preference.PreferenceManager;
 import android.app.Activity;
 import android.content.Intent;
-import android.content.SharedPreferences;
-import android.text.TextUtils;
+import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.TextView;
-import android.widget.Toast;
+
+import com.connect4.utils.Const;
+import com.connect4.utils.Utils;
+import com.example.connect4.R;
+
 
 public class MenuActivity extends Activity {
 
-	Button createGameButton, joinGameButton, statisticsButton, resumeGameButton;
+	Button createGameButton, joinGameButton, resumeGameButton;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_menu);
 		
-		
 		createGameButton = (Button) findViewById(R.id.createGame_button);
 		joinGameButton = (Button) findViewById(R.id.joinGame_button);
-		statisticsButton = (Button) findViewById(R.id.statistics_button);
 		resumeGameButton = (Button) findViewById(R.id.resumeGame_button);
 
 	
@@ -41,6 +33,8 @@ public class MenuActivity extends Activity {
 			@Override
 			public void onClick(View v) {
 				
+				Intent intent = new Intent(MenuActivity.this, CreateGameActivity.class);
+				startActivity(intent);
 				
 			}
 	    });
@@ -50,18 +44,10 @@ public class MenuActivity extends Activity {
 			@Override
 			public void onClick(View v) {
 				
-				
+				Intent intent = new Intent(MenuActivity.this, JoinGameActivity.class);
+				startActivity(intent);
 			}
 	    });
-		
-		statisticsButton.setOnClickListener(new OnClickListener() {
-			
-			@Override
-			public void onClick(View v) {
-				
-				
-			}
-		});
 		
 		resumeGameButton.setOnClickListener(new OnClickListener() {
 			
@@ -100,7 +86,6 @@ public class MenuActivity extends Activity {
 			
 			createGameButton.setVisibility(View.VISIBLE);
 			joinGameButton.setVisibility(View.VISIBLE);
-			statisticsButton.setVisibility(View.VISIBLE);
 			
 			resumeGameButton.setVisibility(View.GONE);
 			
@@ -110,7 +95,6 @@ public class MenuActivity extends Activity {
 			
 			createGameButton.setVisibility(View.GONE);
 			joinGameButton.setVisibility(View.GONE);
-			statisticsButton.setVisibility(View.GONE);
 		}
 		
 	}

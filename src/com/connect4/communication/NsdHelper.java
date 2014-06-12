@@ -1,14 +1,11 @@
-package com.connect4.nsd;
-
-import java.net.Socket;
-import java.util.ArrayList;
+package com.connect4.communication;
 
 import android.content.Context;
 import android.net.nsd.NsdServiceInfo;
 import android.net.nsd.NsdManager;
 import android.util.Log;
 
-public class NetworkDiscoveryHelper {
+public class NsdHelper {
 
     Context mContext;
 
@@ -16,29 +13,23 @@ public class NetworkDiscoveryHelper {
     NsdManager.ResolveListener mResolveListener;
     NsdManager.DiscoveryListener mDiscoveryListener;
     NsdManager.RegistrationListener mRegistrationListener;
-    ArrayList<NetworkPeer> networkPeers;
 
     public static final String SERVICE_TYPE = "_http._tcp.";
 
     public static final String TAG = "NsdHelper";
-    public String mServiceName = "appshuttle";
+    public String mServiceName = "Connect4";
 
     NsdServiceInfo mService;
-    
-    public ArrayList<NetworkPeer> getNetworkPeers() {
-    	return this.networkPeers;
-    }
 
-    public NetworkDiscoveryHelper(Context context) {
+    public NsdHelper(Context context) {
+        mContext = context;
         mNsdManager = (NsdManager) context.getSystemService(Context.NSD_SERVICE);
     }
 
     public void initializeNsd() {
-    	networkPeers = new ArrayList<NetworkPeer>();
         initializeResolveListener();
         initializeDiscoveryListener();
         initializeRegistrationListener();
-
     }
 
     public void initializeDiscoveryListener() {
@@ -51,11 +42,11 @@ public class NetworkDiscoveryHelper {
 
             @Override
             public void onServiceFound(NsdServiceInfo service) {
-                //Log.d(TAG, "Service discovery success" + service);
+                Log.d(TAG, "Service discovery success" + service);
                 if (!service.getServiceType().equals(SERVICE_TYPE)) {
-                    //Log.d(TAG, "Unknown Service Type: " + service.getServiceType());
+                    Log.d(TAG, "Unknown Service Type: " + service.getServiceType());
                 } else if (service.getServiceName().equals(mServiceName)) {
-                    //Log.d(TAG, "Same machine: " + mServiceName);
+                    Log.d(TAG, "Same machine: " + mServiceName);
                 } else if (service.getServiceName().contains(mServiceName)){
                     mNsdManager.resolveService(service, mResolveListener);
                 }
@@ -63,12 +54,10 @@ public class NetworkDiscoveryHelper {
 
             @Override
             public void onServiceLost(NsdServiceInfo service) {
-            	Log.i("appshuttle", "Am pierdut un peer!");
                 Log.e(TAG, "service lost" + service);
                 if (mService == service) {
                     mService = null;
                 }
-                Log.i("appshuttle", "Am pierdut un peer!");
             }
             
             @Override
@@ -100,15 +89,10 @@ public class NetworkDiscoveryHelper {
 
             @Override
             public void onServiceResolved(NsdServiceInfo serviceInfo) {
-                Log.i(TAG, "Resolve Succeeded. " + serviceInfo);
-                /* Do not add duplicates */
-                NetworkPeer newPeer = new NetworkPeer(null, serviceInfo.toString());
-                if(!networkPeers.contains(newPeer))
-                	networkPeers.add(newPeer);
-                else
-                	Log.i("appshuttle", "Refusing to add dups");
+                Log.e(TAG, "Resolve Succeeded. " + serviceInfo);
+
                 if (serviceInfo.getServiceName().equals(mServiceName)) {
-                    Log.i(TAG, "Same IP.");
+                    Log.d(TAG, "Same IP.");
                     return;
                 }
                 mService = serviceInfo;

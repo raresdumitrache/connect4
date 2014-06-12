@@ -9,29 +9,22 @@
     tools:context=".MenuActivity" >
 
     <Button
-        android:id="@+id/createGame_button"
+        android:id="@+id/startGame_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
+        android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
-        android:layout_marginTop="61dp"
-        android:text="Create Game" />
+        android:layout_marginBottom="113dp"
+        android:text="Start Game" />
 
-    <Button
-        android:id="@+id/resumeGame_button"
+    <TextView
+        android:id="@+id/messageView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_above="@+id/startGame_button"
         android:layout_centerHorizontal="true"
-        android:layout_centerVertical="true"
-        android:text="Resume Game" />
-
-    <Button
-        android:id="@+id/joinGame_button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_above="@+id/resumeGame_button"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="14dp"
-        android:text="Join Game" />
+        android:layout_marginBottom="116dp"
+        android:text="Waiting for players..."
+        android:textAppearance="?android:attr/textAppearanceLarge" />
 
 </RelativeLayout>

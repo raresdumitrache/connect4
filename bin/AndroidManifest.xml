@@ -22,6 +22,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name="com.connect4.main.CreateGameActivity"
+            android:label="@string/title_activity_create_game"
+            android:parentActivityName="com.connect4.main.MenuActivity" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.connect4.main.MenuActivity" />
+        </activity>
+        <activity
+            android:name="com.connect4.main.JoinGameActivity"
+            android:label="@string/title_activity_join_game"
+            android:parentActivityName="com.connect4.main.MenuActivity" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.connect4.main.MenuActivity" />
+        </activity>
     </application>
 
 </manifest>
