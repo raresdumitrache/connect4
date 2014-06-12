@@ -52,20 +52,30 @@
 	x = x*50.0f/width - 25.0f;				\
 }
 
+#define SET_COLOR_3f(array, index, color_array) {	\
+	array[index]	= color_array[0];				\
+	array[index+1]	= color_array[1];				\
+	array[index+2]	= color_array[2];			}
+
 static const char gVertexShader[] = 
 	"uniform mat4 p_matrix;\n"
 	"uniform mat4 mv_matrix;\n"
 	"attribute vec4 vPosition;\n"
-	"attribute vec4 vColor;\n"
+	"attribute vec4 aColor;\n"
+	"varying vec4 vColor;"
 	"void main() {\n"
     "  gl_Position = p_matrix * mv_matrix * vPosition;\n"
+	"  vColor = aColor;"
     "}\n";
 
 static const char gFragmentShader[] = 
     "precision mediump float;\n"
+	"varying lowp vec4 vColor;\n"
 	"void main() {\n"
-    "  gl_FragColor = vec4(0, 1, 0, 1);\n"
+    "  gl_FragColor = vColor;\n"
     "}\n";
+
+//vec4(0, 1, 0, 1);\n"
 
 GLfloat p_matrix[16], mv_matrix[16];
 
@@ -102,6 +112,11 @@ static GLfloat player_piece_centers[2][2] = {
 // index of current player (0 or 1)
 static GLint player_in_turn = 0;
 
+static GLfloat player_color[2][3] = {{0.6f, 0.1f, 0.1f},	// player 0's color
+									{0.6f, 0.6f, 0.0f}};	// player 1's color
+static GLfloat grid_color[3] = {0.2f, 0.25f, 0.3f};
+
+
 GLuint gProgram;
 GLuint gvPositionHandle;
 GLuint gvColorHandle;
@@ -122,64 +137,6 @@ float  width = 0, height = 0;
 // coordinates of screen touch
 float touch_x, touch_y;
 bool dragging = false;
-
-// multiply two 4x4 matrices and place the result in the first one
-// m2 x m1 = m1
-static void multiply_matrices(GLfloat *m1, GLfloat *m2)
-{
-	GLint i, j;
-	GLfloat initial_m1[16];
-
-	memcpy(initial_m1, (const void*)m1, 16*sizeof(GLfloat));
-
-	for (i=0; i<16; i+=4)
-		for (j=0; j<4; j++)
-			m1[i+j] = m2[i]*initial_m1[j] + m2[i+1]*initial_m1[j+4] +
-						m2[i+2]*initial_m1[j+8] + m2[i+3]*initial_m1[j+12];
-}
-
-static void rotate_matrix(GLfloat *matrix)
-{
-	GLfloat sin_x = sin(r_x);
-	GLfloat cos_x = cos(r_x);
-
-	GLfloat sin_y = sin(r_y);
-	GLfloat cos_y = cos(r_y);
-
-	GLfloat sin_z = sin(r_z);
-	GLfloat cos_z = cos(r_z);
-
-	GLfloat rotation_matrix[16] = {
-			cos_y*cos_z, cos_z*sin_x*sin_y-cos_x*sin_z, cos_x*cos_z*sin_y+sin_x*sin_z, 0.0f,
-			cos_y*sin_z, cos_x*cos_z+sin_x*sin_y*sin_z, -cos_z*sin_x+cos_x*sin_y*sin_z, 0.0f,
-			-sin_y, cos_y * sin_x, cos_x * cos_y, 0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f};
-	GLfloat transl_matrix[16] = {1.0f, 0.0f, 0.0f, 0.0f,
-								0.0f, 1.0f, 0.0f, 0.0f,
-								0.0f, 0.0f, 0.1f, 0.0f,
-								eye_position[0], eye_position[1], eye_position[2], 1.0f };
-
-	//multiply_matrices(mv_matrix, rotation_matrix);
-	memcpy(matrix, (const void *)rotation_matrix, sizeof(GLfloat)*16);
-	multiply_matrices(matrix, transl_matrix);
-}
-
-
-static void translate_matrix (GLfloat *matrix)
-{
-	GLfloat transl_matrix1[16] = {1.0f, 0.0f, 0.0f, t_x,
-								0.0f, 1.0f, 0.0f, t_y,
-								0.0f, 0.0f, 0.1f, t_z,
-								0.0f, 0.0f, 0.0f, 1.0f };
-	GLfloat transl_matrix2[16] = {1.0f, 0.0f, 0.0f, 0.0f,
-								0.0f, 1.0f, 0.0f, 0.0f,
-								0.0f, 0.0f, 0.1f, 0.0f,
-								eye_position[0], eye_position[1], eye_position[2], 1.0f };
-
-	//memcpy(matrix, (const void *)transl_matrix1, sizeof(GLfloat)*16);
-	multiply_matrices(matrix, transl_matrix1);
-	multiply_matrices(matrix, transl_matrix2);
-}
 
 GLuint load_shader(GLenum shaderType, const char* pSource) {
     GLuint shader = glCreateShader(shaderType);
@@ -317,9 +274,9 @@ bool setup_graphics(int w, int h) {
     gPmatrix			= glGetUniformLocation(gProgram, "p_matrix");
     gMVmatrix			= glGetUniformLocation(gProgram, "mv_matrix");
     gvPositionHandle	= glGetAttribLocation(gProgram, "vPosition");
-    gvColorHandle		= glGetAttribLocation(gProgram, "vColor");
+    gvColorHandle		= glGetAttribLocation(gProgram, "aColor");
 
-    LOGI("color handle = %i", gvColorHandle);
+    LOGI("color handle = %i, pos handle = %i", gvColorHandle, gvPositionHandle);
 
     glViewport(0, 0, w, h);
 
@@ -341,12 +298,14 @@ static void draw_grid()
 	GLfloat dist_x		= GRID_MAX_X - GRID_MIN_X,
 			dist_y		= GRID_MAX_Y - GRID_MIN_Y,
 			line_end_x, line_end_y, delta;
-	GLint i;
+	GLint i, color_index;
+	GLfloat color[GRID_COLUMNS * 2 * 3]; // GRID_COLUMNS > GRID_LINES
 
 	// horizontal borders
 	line_end_x	= GRID_MIN_X;
 	line_end_y	= GRID_MIN_Y;
 	delta		= dist_x;
+	color_index	= 0;
 	for (i=0; i<GRID_LINES*4;i+=4) {
 		// first end of line (x,y)
 		grid[i]		= line_end_x;
@@ -360,8 +319,15 @@ static void draw_grid()
 
 		line_end_y	+= LINE_STEP;
 		delta		*= -1;
+
+		// set color for this line ()
+		SET_COLOR_3f(color, color_index, grid_color);
+		SET_COLOR_3f(color, color_index+3, grid_color);
+
+		color_index	+= 6;
 	}
 
+	glVertexAttribPointer(gvColorHandle, 3, GL_FLOAT, GL_FALSE, 0, color);
 	glVertexAttribPointer(gvPositionHandle, 2, GL_FLOAT, GL_FALSE, 0, grid);
 	glDrawArrays(GL_LINE_STRIP, 0, GRID_LINES * 2);
 
@@ -369,6 +335,7 @@ static void draw_grid()
 	line_end_x	= GRID_MIN_X;
 	line_end_y	= GRID_MIN_Y;
 	delta		= dist_y;
+	color_index	= 0;
 	for (i=0; i<GRID_COLUMNS*4;i+=4) {
 		// first end of line (x,y)
 		grid[i]		= line_end_x;
@@ -382,17 +349,25 @@ static void draw_grid()
 
 		line_end_x	+= COLUMN_STEP;
 		delta		*= -1;
+
+		// set color for this line ()
+		SET_COLOR_3f(color, color_index, grid_color);
+		SET_COLOR_3f(color, color_index+3, grid_color);
+
+		color_index	+= 6;
 	}
 
+	glVertexAttribPointer(gvColorHandle, 3, GL_FLOAT, GL_FALSE, 0, color);
 	glVertexAttribPointer(gvPositionHandle, 2, GL_FLOAT, GL_FALSE, 0, grid);
 	glDrawArrays(GL_LINE_STRIP, 0, GRID_COLUMNS * 2);
 }
 
-static void draw_circle(GLfloat center_x, GLfloat center_y, GLfloat radius)
+static void draw_circle(GLfloat center_x, GLfloat center_y, GLfloat radius,
+		GLfloat color[3], GLfloat center_color[3])
 {
 	GLfloat circle[360 * 4 + 2], x, y;
-	GLint i;
-	GLfloat colors[4] = {1.0f, 0.0f, 0.0f, 1.0f};
+	GLfloat circle_color[360*6 + 3];
+	GLint i, color_index = 0;
 
 	for (i=0; i<360*4; i+=4) {
 		circle[i]	= radius * cos(i/4.0f * 0.0174532f) + center_x;
@@ -400,45 +375,68 @@ static void draw_circle(GLfloat center_x, GLfloat center_y, GLfloat radius)
 
 		circle[i+2]	= center_x;
 		circle[i+3]	= center_y;
+
+		// set colors
+		SET_COLOR_3f(circle_color, color_index, color);
+		SET_COLOR_3f(circle_color, color_index + 3, center_color);
+		color_index += 6;
 	}
 
 	circle[i]	= center_x + radius;
 	circle[i+1]	= center_y;
+	SET_COLOR_3f(circle_color, color_index, color);
 
+	glVertexAttribPointer(gvColorHandle, 3, GL_FLOAT, GL_FALSE, 0, circle_color);
 	glVertexAttribPointer(gvPositionHandle, 2, GL_FLOAT, GL_FALSE, 0, circle);
-	glVertexAttribPointer(gvColorHandle, 4, GL_FLOAT, GL_FALSE, 0, colors);
-
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 360*2+1);
 }
 
 static void draw_players_pieces()
 {
-	int player, piece;
+	int player, piece, i;
+	float c_color[3];
 
-	for (player=0; player<2; player++) {
+	player = player_in_turn;
+	for (i=0; i<2; i++) {
+		c_color[0]	= player_color[player][0] + 0.2f;
+		c_color[1]	= player_color[player][1] + 0.2f;
+		c_color[2]	= player_color[player][2] + 0.2f;
+
 		piece = 0;
-
 		while (piece < pieces_on_board[player]) {
 			draw_circle(player_pieces[player][piece][0],
-						player_pieces[player][piece][1], RADIUS);
+						player_pieces[player][piece][1], RADIUS,
+						player_color[player],
+						c_color);
 
 			piece++;
 		}
+
+		player = 1 - player;
 	}
 }
 
 static void draw_pieces_to_play()
 {
-	int other_player = 1 - player_in_turn;
+	int other_player	= 1 - player_in_turn;
 
 	// draw piece of the current player
-	draw_circle(touch_x, touch_y, RADIUS);
+	GLfloat center_color[3]	= {0.6f, 0.6f, 0.6f};
+	draw_circle(touch_x, touch_y, RADIUS, player_color[player_in_turn],
+				center_color);
 
 	// draw piece of the other player
+	center_color[0] = player_color[other_player][0] - 0.2f;
+	center_color[1] = player_color[other_player][1] - 0.2f;
+	center_color[2] = player_color[other_player][2] - 0.2f;
+
 	draw_circle(player_piece_centers[other_player][0],
 			player_piece_centers[other_player][1],
-			RADIUS);
+			RADIUS,
+			player_color[other_player],
+			center_color);
 }
+
 
 void render_frame() {
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
